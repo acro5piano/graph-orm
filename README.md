@@ -171,6 +171,10 @@ const orm = new GraphORM({
   ],
 })
 
+// Returns
+// - every user field where id = 1
+// - every posts and its fields where user_id = 1 or status = 'public'
+// - only 'id', 'name' from users where id != 1, email become null
 orm.graphql(
   gql`
     query {
@@ -178,6 +182,10 @@ orm.graphql(
         id
         name
         email
+        posts {
+          id
+          title
+        }
       }
     }
   `,
