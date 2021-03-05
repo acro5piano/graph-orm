@@ -161,9 +161,9 @@ const orm = new GraphORM({
           column: 'some_complicated_column',
           // Not performant, but flexible check
           checks: [
-            async((user) => {
+            async function checkExternalAPI(user) {
               return ExternalAPIClient.get(user.id).then((res) => res.ok)
-            }),
+            },
           ],
         },
       ],
