@@ -64,6 +64,8 @@ async function main() {
   await mutate()
   const { data } = await query()
   console.log(data)
+  // outputs:
+  //
   // {
   //   data: {
   //     users: [
@@ -110,7 +112,6 @@ Strong ACL support is hard part of GraphQL. With GraphORM, you can handle with a
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
 import Knex from 'knex'
-import Fastify from 'fastify'
 
 const knex = new Knex({
   client: 'pg',
