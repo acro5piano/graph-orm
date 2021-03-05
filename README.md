@@ -118,9 +118,8 @@ const knex = new Knex({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
 
-const orm = new GraphORM({ knex })
-
 const orm = new GraphORM({
+  knex,
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
   acl: [
     {
@@ -204,9 +203,7 @@ const knex = new Knex({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
 
-const orm = new GraphORM({
-  knex,
-})
+const orm = new GraphORM({ knex })
 
 interface Context {
   userId: number
