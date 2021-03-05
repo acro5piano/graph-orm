@@ -44,9 +44,9 @@ const knex = new Knex({
 const orm = new GraphORM({ knex })
 
 async function mutate() {
-  await orm.raw`
+  await knex.raw(`
     insert into users(name) values ('Kay');
-  `
+  `)
 }
 
 async function query() {
@@ -127,6 +127,7 @@ const orm = new GraphORM({
       rules: [
         {
           column: 'email',
+          // This is queried while executing the SQL
           checks: ['users.id = :userId'],
         },
       ],
@@ -149,6 +150,20 @@ const orm = new GraphORM({
           column: '*',
           checks: [
             sql`exists ( select * from posts where posts.user_id = :userId and posts.id = posts_tags.post_id)`,
+          ],
+        },
+      ],
+    },
+    {
+      table: 'users',
+      rules: [
+        {
+          column: 'some_complicated_column',
+          // Not performant, but flexible check
+          checks: [
+            async((user) => {
+              return ExternalAPIClient.get(user.id).then((res) => res.ok)
+            }),
           ],
         },
       ],
