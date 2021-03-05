@@ -1,6 +1,6 @@
 # GraphORM
 
-[experimental] GraphQL oriented Node.js ORM for PostgreSQL focused on Querying & ACL.
+[experimental] GraphQL oriented Node.js ORM for PostgreSQL focusng on querying & ACL.
 
 # Design Goal
 
@@ -10,7 +10,7 @@ GraphORM generates GraphQL schema from PostgreSQL schema. No redundant code requ
 
 ### Query everything with GraphQL
 
-GraphORM is intended to query/mutate data even local operation to make everything simple.
+GraphORM is intended to query data even local operation to make everything simple.
 
 ### Performant
 
@@ -22,7 +22,11 @@ GraphORM handles Access Control with row-level, column-level, and both.
 
 ### Framework agnostic
 
-GraphORM is ORM. ORM dones't touch HTTP layer, meaning users can use their favorite technologcy.
+GraphORM is an ORM. ORM dones't touch HTTP layer. You can use your favorite technologies.
+
+### Based on Knex
+
+GraphORM focues on quering and ACL, so delegate other staff to Knex. Less is more. You can even mix GraphORM with other ORMs like Objection.js, mikro-orm, and so on.
 
 # Spec
 
@@ -30,10 +34,14 @@ GraphORM is ORM. ORM dones't touch HTTP layer, meaning users can use their favor
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
+import Knex from 'knex'
 
-const orm = new GraphORM({
+const knex = new Knex({
+  client: 'pg',
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
+
+const orm = new GraphORM({ knex })
 
 async function mutate() {
   await orm.raw`
@@ -74,12 +82,16 @@ async function main() {
 In this example we use `fastify`, but anything can be here.
 
 ```typescript
-import { GraphORM } from '@graph-orm/core'
+import { GraphORM, gql } from '@graph-orm/core'
+import Knex from 'knex'
 import Fastify from 'fastify'
 
-const orm = new GraphORM({
+const knex = new Knex({
+  client: 'pg',
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
+
+const orm = new GraphORM({ knex })
 
 const app = Fastify()
 
@@ -97,7 +109,15 @@ Strong ACL support is hard part of GraphQL. With GraphORM, you can handle with a
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
+import Knex from 'knex'
 import Fastify from 'fastify'
+
+const knex = new Knex({
+  client: 'pg',
+  connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
+})
+
+const orm = new GraphORM({ knex })
 
 const orm = new GraphORM({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
@@ -115,8 +135,10 @@ const orm = new GraphORM({
       table: 'posts',
       rules: [
         {
-          column: 'title',
-          checks: ['posts.user_id = :userId'],
+          column: '*',
+          checks: [
+            "posts.status = 'public' or posts.user_id = :userId or :userRole = 'ADMIN'",
+          ],
         },
       ],
     },
@@ -125,7 +147,6 @@ const orm = new GraphORM({
       rules: [
         {
           column: '*',
-          operations: ['write'],
           checks: [
             sql`exists ( select * from posts where posts.user_id = :userId and posts.id = posts_tags.post_id)`,
           ],
@@ -148,6 +169,7 @@ orm.graphql(
   {
     context: {
       userId: 1, // :userId will be replaced with this value
+      userRole: 'general', // :userRole will be replaced with this value
     },
   },
 )
@@ -155,14 +177,24 @@ orm.graphql(
 
 ### Mutation and Context
 
-GraphORM focues on querying, so you should write your own logic for mutations.
+GraphORM focues on querying, so you should write your own logic for mutations. I personally don't think writing GraphQL is not hard thing, compared to writing performant query.
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
+import Knex from 'knex'
 
-const orm = new GraphORM({
+const knex = new Knex({
+  client: 'pg',
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
+
+const orm = new GraphORM({
+  knex,
+})
+
+interface Context {
+  userId: number
+}
 
 orm.extendSchema(gql`
   input UserInput {
@@ -170,26 +202,13 @@ orm.extendSchema(gql`
   }
 
   type Mutation {
-    updateUser(id: ID!, input: UserInput!): User
+    updateUser(input: UserInput!): User
   }
 `)
 
-interface UserInput {
-  name: string
-}
-
-interface UpdateUserArgs {
-  id: string
-  input: UserInput
-}
-
-async function updateUser({ id, input }: UpdateUserArgs) {
-  await orm.knex('users').update(input).where({ id })
-}
-
-orm.defineResolvers({
-  Mutation: {
-    updateUser: (_, args: UpdateUserArgs) => updateUser(args),
+orm.defineMutations({
+  updateUser: (_, args: UpdateUserArgs, ctx: Context) => {
+    return orm.knex('users').update(input).where({ id }).returing('*')
   },
 })
 ```
