@@ -1,51 +1,39 @@
 # GraphORM
 
-[experimental] GraphQL oriented Node.js ORM for PostgreSQL focusng on querying & ACL.
+[experimental] GraphQL oriented Node.js ORM for PostgreSQL.
 
 # Design Goal
 
-### Automatic schema generation
-
-GraphORM generates GraphQL schema from PostgreSQL schema. No redundant code required.
-
-### Query everything with GraphQL
-
-GraphORM is intended to query data even local operation to make everything simple.
-
-### Performant
-
-GraphORM compiles GraphQL into performant SQL. No N+1 problem by default.
-
-### ACL support
-
-GraphORM handles Access Control with row-level, column-level, and both.
-
-### Framework agnostic
-
-GraphORM is an ORM. ORM dones't touch HTTP layer. You can use your favorite technologies.
-
-### Based on Knex
-
-GraphORM focues on quering and ACL, so delegate other staff to Knex. Less is more. You can even mix GraphORM with other ORMs like Objection.js, mikro-orm, and so on.
+- **Automatic schema generation** GraphORM generates GraphQL schema from PostgreSQL schema. No redundant code required.
+- **Query everything with GraphQL** GraphORM is intended to query/mutate data even local operations to make everything simple.
+- **Performant** GraphORM compiles GraphQL into performant SQL. No N+1 problem by default.
+- **ACL support** GraphORM handles Access Control with row-level, column-level, and both.
+- **Framework agnostic** GraphORM is an ORM. ORM dones't touch HTTP layer. You can use your favorite technologies.
+- **Extensible**: Easy to extend schema for custom resolvers
 
 # Spec
+
+This is just README. No implementation. Just a concept.
 
 ### Basic
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
-import Knex from 'knex'
 
-const knex = new Knex({
-  client: 'pg',
+const orm = new GraphORM({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
 
-const orm = new GraphORM({ knex })
-
 async function mutate() {
-  await knex.raw(`
-    insert into users(name) values ('Kay');
+  await orm.graphql(gql`
+    mutation {
+      insertUsers(objects: [{ name: "Kay" }]) {
+        reeturning {
+          id
+          name
+        }
+      }
+    }
   `)
 }
 
@@ -85,15 +73,11 @@ In this example we use `fastify`, but anything can be here.
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
-import Knex from 'knex'
 import Fastify from 'fastify'
 
-const knex = new Knex({
-  client: 'pg',
+const orm = new GraphORM({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
 })
-
-const orm = new GraphORM({ knex })
 
 const app = Fastify()
 
@@ -111,15 +95,8 @@ Strong ACL support is hard part of GraphQL. With GraphORM, you can handle with a
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
-import Knex from 'knex'
-
-const knex = new Knex({
-  client: 'pg',
-  connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
-})
 
 const orm = new GraphORM({
-  knex,
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
   acl: [
     {
@@ -127,8 +104,8 @@ const orm = new GraphORM({
       rules: [
         {
           column: 'email',
-          // This is queried while executing the SQL
-          checks: ['users.id = :userId'],
+          type: ['read', 'write'],
+          checks: ['users.id = :userId'], // This is compared while executing the SQL
         },
       ],
     },
@@ -136,7 +113,8 @@ const orm = new GraphORM({
       table: 'posts',
       rules: [
         {
-          column: '*',
+          columns: ['title', 'content'], // Specify multiple columns at once
+          type: ['write'],
           checks: [
             "posts.status = 'public' or posts.user_id = :userId or :userRole = 'ADMIN'",
           ],
@@ -147,7 +125,7 @@ const orm = new GraphORM({
       table: 'posts_tags',
       rules: [
         {
-          column: '*',
+          column: ['post_id', 'tag_id'],
           checks: [
             sql`exists ( select * from posts where posts.user_id = :userId and posts.id = posts_tags.post_id)`,
           ],
@@ -198,38 +176,23 @@ orm.graphql(
 )
 ```
 
-### Mutation and Context
+### Extend GraphQL Schema
 
 GraphORM focues on querying, so you should write your own logic for mutations. I personally don't think writing GraphQL is not hard thing, compared to writing performant query.
 
 ```typescript
 import { GraphORM, gql } from '@graph-orm/core'
-import Knex from 'knex'
 
-const knex = new Knex({
-  client: 'pg',
+const HealthResolver = () => 'ok'
+
+const orm = new GraphORM({
   connection: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
+  customResolvers: [HealthResolver],
 })
-
-const orm = new GraphORM({ knex })
-
-interface Context {
-  userId: number
-}
 
 orm.extendSchema(gql`
-  input UserInput {
-    name: String
-  }
-
-  type Mutation {
-    updateUser(input: UserInput!): User
+  type Query {
+    health: String
   }
 `)
-
-orm.defineMutations({
-  updateUser: (_, args: UpdateUserArgs, ctx: Context) => {
-    return orm.knex('users').update(input).where({ id }).returing('*')
-  },
-})
 ```
