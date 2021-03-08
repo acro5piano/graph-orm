@@ -22,16 +22,28 @@ async function createTestSchema(orm: GraphORM) {
   `)
 }
 
+async function createTestData(orm: GraphORM) {
+  const { rows } = await orm.pg.query(`
+    insert into users (name) values ('Kay') returning *;
+  `)
+  await orm.pg.query(
+    `
+    insert into posts (user_id, title) values ($1, 'GraphORM is awesome') returning *;
+  `,
+    [rows[0].id],
+  )
+}
+
 test('GraphORM', async (t) => {
   t.truthy(GraphORM)
   const orm = new GraphORM({
     connection: 'postgres://postgres:postgres@127.0.0.1:45432/postgres',
   })
   t.truthy(orm)
-  await orm.initializeSchema()
+  await orm.init()
   await createTestSchema(orm)
 
-  const res = await orm.graphql(gql`
+  const query = gql`
     query {
       users {
         id
@@ -42,11 +54,30 @@ test('GraphORM', async (t) => {
         }
       }
     }
-  `)
+  `
 
-  t.deepEqual(res, {
+  t.deepEqual(await orm.graphql(query), {
     data: {
       users: [],
+    },
+  })
+
+  await createTestData(orm)
+
+  t.deepEqual(await orm.graphql(query), {
+    data: {
+      users: [
+        {
+          id: '1',
+          name: 'Kay',
+          posts: [
+            {
+              id: '1',
+              title: 'GraphORM is awesome',
+            },
+          ],
+        },
+      ],
     },
   })
 })
