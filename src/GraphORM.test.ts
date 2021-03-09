@@ -1,49 +1,48 @@
 import test from 'ava'
 import { GraphORM } from './GraphORM'
-import { gql } from './helpers'
+import { gql, testConfig, createTestData, createTestSchema } from './test-utils'
 
-async function createTestSchema(orm: GraphORM) {
-  await orm.pg.query(`
-    DROP SCHEMA public CASCADE;
-    CREATE SCHEMA public;
-
-    CREATE TABLE users (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) not null default ''
-    );
-
-    CREATE TABLE posts (
-      id SERIAL PRIMARY KEY,
-      user_id integer not null,
-      title VARCHAR(255) not null default ''
-    );
-
-    ALTER TABLE "posts" ADD CONSTRAINT "posts_user_id_foreign" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE;
-  `)
-}
-
-async function createTestData(orm: GraphORM) {
-  const { rows } = await orm.pg.query(`
-    insert into users (name) values ('Kay') returning *;
-  `)
-  await orm.pg.query(
-    `
-    insert into posts (user_id, title) values ($1, 'GraphORM is awesome') returning *;
-  `,
-    [rows[0].id],
-  )
-}
-
-test('GraphORM', async (t) => {
+test.serial('GraphORM', async (t) => {
   t.truthy(GraphORM)
-  const orm = new GraphORM({
-    connection: 'postgres://postgres:postgres@127.0.0.1:45432/postgres',
-  })
+  const orm = new GraphORM(testConfig)
   t.truthy(orm)
+})
+
+test.serial('printSchema', async (t) => {
+  const orm = new GraphORM(testConfig)
+  await orm.init()
+  await createTestSchema(orm)
+  t.is(
+    gql(orm.printSchema()),
+    gql`
+      type Query {
+        posts: [Post]
+        users: [User]
+      }
+
+      type Post {
+        id: String
+        userId: String
+        title: String
+        user: User
+      }
+
+      type User {
+        id: String
+        name: String
+        posts: [Post]
+      }
+    `,
+  )
+})
+
+test.serial('hasMany', async (t) => {
+  const orm = new GraphORM(testConfig)
+
   await orm.init()
   await createTestSchema(orm)
 
-  const query = gql`
+  const usersQuery = gql`
     query {
       users {
         id
@@ -56,7 +55,7 @@ test('GraphORM', async (t) => {
     }
   `
 
-  t.deepEqual(await orm.graphql(query), {
+  t.deepEqual(await orm.graphql(usersQuery), {
     data: {
       users: [],
     },
@@ -64,7 +63,7 @@ test('GraphORM', async (t) => {
 
   await createTestData(orm)
 
-  t.deepEqual(await orm.graphql(query), {
+  t.deepEqual(await orm.graphql(usersQuery), {
     data: {
       users: [
         {
@@ -76,6 +75,42 @@ test('GraphORM', async (t) => {
               title: 'GraphORM is awesome',
             },
           ],
+        },
+      ],
+    },
+  })
+})
+
+test.serial('belongsTo', async (t) => {
+  const orm = new GraphORM(testConfig)
+
+  await orm.init()
+  await createTestSchema(orm)
+  await createTestData(orm)
+
+  const postsQuery = gql`
+    query {
+      posts {
+        id
+        title
+        user {
+          id
+          name
+        }
+      }
+    }
+  `
+
+  t.deepEqual(await orm.graphql(postsQuery), {
+    data: {
+      posts: [
+        {
+          id: '1',
+          title: 'GraphORM is awesome',
+          user: {
+            id: '1',
+            name: 'Kay',
+          },
         },
       ],
     },

@@ -1,3 +1,5 @@
+import camelcase from 'camelcase'
+import pluralize from 'pluralize'
 import {
   GraphQLList,
   GraphQLBoolean,
@@ -9,7 +11,7 @@ import {
 import { tableNameToTypeName } from './helpers'
 import { GraphORM } from './GraphORM'
 
-export type Field = ScalarField | HasManyField | HasOneField
+export type Field = ScalarField | HasManyField | HasOneField | BelongsToOneField
 
 type Scalar = 'string' | 'integer' | 'boolean' | 'id'
 type FieldType = string | Scalar
@@ -28,19 +30,30 @@ interface ScalarField extends BaseField {
 interface HasManyField extends BaseField {
   kind: 'HasManyField'
   type: string
+  fromColumn: string
+  toColumn: string
 }
 
 interface HasOneField extends BaseField {
-  kind: 'HasManyField'
+  kind: 'HasOneField'
   type: string
+  fromColumn: string
+  toColumn: string
+}
+
+interface BelongsToOneField extends BaseField {
+  kind: 'BelongsToOneField'
+  type: string
+  fromColumn: string
+  toColumn: string
 }
 
 // function isModel(s: Scalar | Model): s is Model {
 //   return s instanceof Model
 // }
 
-function isScalar(s: Scalar | string): s is Scalar {
-  return ['string', 'integer', 'boolean', 'id'].includes(s as Scalar)
+function isScalarField(field: Field): field is ScalarField {
+  return ['string', 'integer', 'boolean', 'id'].includes(field.type as Scalar)
 }
 
 function scalarToGraphQLType(s: Scalar) {
@@ -82,25 +95,43 @@ export class Model {
         }
         // TODO: this code is not type-safe
         const fields = this.fields.reduce((fields, field) => {
-          if (isScalar(field.type)) {
+          if (isScalarField(field)) {
             return {
               ...fields,
-              [field.name]: {
+              [camelcase(field.name)]: {
                 type: scalarToGraphQLType(field.type),
               },
             }
           } else {
             return {
               ...fields,
-              [field.name]: {
-                // TODO: consider has_one
-                type: new GraphQLList(typeMap.get(field.type)!),
+              [camelcase(field.name)]: {
+                type:
+                  field.kind === 'HasManyField'
+                    ? new GraphQLList(typeMap.get(field.type)!)
+                    : typeMap.get(field.type)!,
 
                 // TODO: use batch loader by Context
-                resolve: () => {
-                  return this.orm.pg
-                    .query(`select * from "${field.name}"`) // TODO: add check table name for SQL injection
-                    .then((res) => res.rows)
+                resolve: (root: any) => {
+                  if (field.kind === 'HasManyField') {
+                    return this.orm.knex
+                      .select('*')
+                      .from(field.name)
+                      .where({ [field.toColumn]: root[field.fromColumn] })
+                  } else if (field.kind === 'HasOneField') {
+                    return this.orm.knex
+                      .select('*')
+                      .from(field.name)
+                      .where({ [field.toColumn]: root[field.fromColumn] })
+                      .first()
+                  } else if (field.kind === 'BelongsToOneField') {
+                    return this.orm.knex
+                      .select('*')
+                      .from(pluralize(field.name))
+                      .where({ [field.toColumn]: root[field.fromColumn] })
+                      .first()
+                  }
+                  throw new Error('Cannot resolve type')
                 },
               },
             }

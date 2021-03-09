@@ -1,29 +1,49 @@
-import { Client } from 'pg'
+import { knex, Knex } from 'knex'
 import camelcase from 'camelcase'
+import pluralize from 'pluralize'
+
 import { tableNameToTypeName } from './helpers'
 import { DatabaseSchema } from './DatabaseSchema'
 import { Model, Field } from './Model'
 import {
+  printSchema,
   graphql,
   GraphQLSchema,
+  GraphQLFieldConfigMap,
   // GraphQLInt,
   // GraphQLNonNull,
   GraphQLList,
   GraphQLObjectType,
 } from 'graphql'
 
+// @see https://github.com/khmm12/knex-tiny-logger/issues/9
+// import knexTinyLogger from 'knex-tiny-logger'
+
+const knexStringcase = require('knex-stringcase')
+
 export interface GraphORMOptions {
   connection: string
+  logSql?: boolean
 }
 
 export class GraphORM {
-  pg: Client
+  knex: Knex
   typeMap = new Map<string, GraphQLObjectType>()
   private databaseSchema: DatabaseSchema
   private _schema?: GraphQLSchema
 
   constructor(options: GraphORMOptions) {
-    this.pg = new Client({ connectionString: options.connection })
+    this.knex = knex(
+      knexStringcase({
+        client: 'pg',
+        connection: options.connection,
+      }),
+    )
+
+    if (options.logSql) {
+      this.knex.on('query', (sql) => console.log(sql.sql))
+    }
+
     this.databaseSchema = new DatabaseSchema(this)
   }
 
@@ -35,7 +55,6 @@ export class GraphORM {
   }
 
   async init() {
-    await this.pg.connect()
     await this.databaseSchema.init()
 
     const typeMap = new Map<string, GraphQLObjectType>()
@@ -48,34 +67,52 @@ export class GraphORM {
         nullable: false, // TODO
         type: 'string',
       }))
-      const relations = this.databaseSchema.relationInfo
+
+      // TODO: Adding a unique constraint to the relation table column for the table. c.f.) https://hasura.io/docs/latest/graphql/core/guides/data-modelling/one-to-one.html#one-to-one-modelling
+      const hasManyRelations = this.databaseSchema.relationInfo
         .filter((info) => info.foreignTableName === tableName)
         .map((relation) => ({
-          kind: 'HasManyField' as const, // TODO
+          kind: 'HasManyField' as const,
           name: camelcase(relation.tableName),
           nullable: false, // TODO
-          type: 'Post',
+          type: tableNameToTypeName(relation.tableName), // TODO
+          fromColumn: camelcase(relation.foreignColumnName),
+          toColumn: camelcase(relation.columnName),
         }))
-      // TODO: use databaseSchema.relationInfo
+      const belongsToOneRelations = this.databaseSchema.relationInfo
+        .filter((info) => info.tableName === tableName)
+        .map((relation) => ({
+          kind: 'BelongsToOneField' as const, // TODO
+          name: camelcase(pluralize.singular(relation.foreignTableName)),
+          nullable: false, // TODO
+          type: tableNameToTypeName(relation.foreignTableName), // TODO
+          fromColumn: camelcase(relation.columnName),
+          toColumn: camelcase(relation.foreignColumnName),
+        }))
       modelsMap.set(
         tableName,
-        new Model(tableName, [...fields, ...relations], this),
+        new Model(
+          tableName,
+          [...fields, ...hasManyRelations, ...belongsToOneRelations],
+          this,
+        ),
       )
     })
 
+    const rootFields: GraphQLFieldConfigMap<any, any> = {}
+
     modelsMap.forEach((model, tableName) => {
-      typeMap.set(tableNameToTypeName(tableName), model.toGraphQLType(typeMap))
+      const typeName = tableNameToTypeName(tableName)
+      typeMap.set(typeName, model.toGraphQLType(typeMap))
+      rootFields[camelcase(tableName)] = {
+        type: new GraphQLList(typeMap.get(typeName)!),
+        resolve: () => this.knex(tableName),
+      }
     })
 
     const query = new GraphQLObjectType({
       name: 'Query',
-      fields: {
-        users: {
-          type: new GraphQLList(typeMap.get('User')!),
-          resolve: () =>
-            this.pg.query('select * from users').then((res) => res.rows),
-        },
-      },
+      fields: rootFields,
     })
 
     typeMap.set('Query', query)
@@ -92,5 +129,9 @@ export class GraphORM {
       schema: this.schema,
       source: query,
     })
+  }
+
+  printSchema() {
+    return printSchema(this.schema)
   }
 }

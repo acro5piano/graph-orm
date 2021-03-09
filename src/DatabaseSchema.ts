@@ -35,7 +35,7 @@ export class DatabaseSchema {
   }
 
   async init() {
-    const tableColumns = await this.orm.pg.query(`
+    const tableColumns = await this.orm.knex.raw(`
       select
              t.table_name as "tableName",
              column_name  as "columnName",
@@ -50,7 +50,7 @@ export class DatabaseSchema {
     `)
     this._tables = tableColumns.rows
 
-    const foreigns = await this.orm.pg.query(`
+    const foreigns = await this.orm.knex.raw(`
       SELECT
            tc.table_name   AS "tableName",
            kcu.column_name AS "columnName",
