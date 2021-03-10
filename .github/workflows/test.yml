@@ -21,4 +21,5 @@ jobs:
       - run: |
           yarn install
           yarn tsc
+          docker-compose up -d
           yarn test
