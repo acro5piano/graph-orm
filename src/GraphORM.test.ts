@@ -26,21 +26,21 @@ test.serial('printSchema', async (t) => {
     gql(orm.printSchema()),
     gql`
       type Query {
-        posts: [Post]
-        users: [User]
+        posts: [Post!]
+        users: [User!]
       }
 
       type Post {
         id: String
         userId: String
         title: String
-        user: User
+        user: User!
       }
 
       type User {
         id: String
         name: String
-        posts: [Post]
+        posts: [Post!]
       }
     `,
   )

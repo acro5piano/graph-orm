@@ -11,7 +11,7 @@ import {
   GraphQLSchema,
   GraphQLFieldConfigMap,
   // GraphQLInt,
-  // GraphQLNonNull,
+  GraphQLNonNull,
   GraphQLList,
   GraphQLObjectType,
 } from 'graphql'
@@ -105,7 +105,7 @@ export class GraphORM {
       const typeName = tableNameToTypeName(tableName)
       typeMap.set(typeName, model.toGraphQLType(typeMap))
       rootFields[camelcase(tableName)] = {
-        type: new GraphQLList(typeMap.get(typeName)!),
+        type: new GraphQLList(new GraphQLNonNull(typeMap.get(typeName)!)),
         resolve: () => this.knex(tableName),
       }
     })

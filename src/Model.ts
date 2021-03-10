@@ -2,6 +2,7 @@ import camelcase from 'camelcase'
 import pluralize from 'pluralize'
 import {
   GraphQLList,
+  GraphQLNonNull,
   GraphQLBoolean,
   GraphQLString,
   GraphQLID,
@@ -108,8 +109,10 @@ export class Model {
               [camelcase(field.name)]: {
                 type:
                   field.kind === 'HasManyField'
-                    ? new GraphQLList(typeMap.get(field.type)!)
-                    : typeMap.get(field.type)!,
+                    ? new GraphQLList(
+                        new GraphQLNonNull(typeMap.get(field.type)!),
+                      )
+                    : new GraphQLNonNull(typeMap.get(field.type)!), // Fore sure, Foregin Reference check here
 
                 // TODO: use batch loader by Context
                 resolve: (root: any) => {
