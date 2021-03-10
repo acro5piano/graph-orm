@@ -1,6 +1,16 @@
 import test from 'ava'
 import { GraphORM } from './GraphORM'
 import { gql, testConfig, createTestData, createTestSchema } from './test-utils'
+import { Client } from 'pg'
+
+test.beforeEach(async () => {
+  const pg = new Client({ connectionString: testConfig.connection })
+  await pg.connect()
+  await pg.query(`
+    DROP SCHEMA public CASCADE;
+    CREATE SCHEMA public;
+  `)
+})
 
 test.serial('GraphORM', async (t) => {
   t.truthy(GraphORM)
@@ -10,8 +20,8 @@ test.serial('GraphORM', async (t) => {
 
 test.serial('printSchema', async (t) => {
   const orm = new GraphORM(testConfig)
+  await createTestSchema(orm.knex)
   await orm.init()
-  await createTestSchema(orm)
   t.is(
     gql(orm.printSchema()),
     gql`
@@ -39,8 +49,8 @@ test.serial('printSchema', async (t) => {
 test.serial('hasMany', async (t) => {
   const orm = new GraphORM(testConfig)
 
+  await createTestSchema(orm.knex)
   await orm.init()
-  await createTestSchema(orm)
 
   const usersQuery = gql`
     query {
@@ -61,7 +71,7 @@ test.serial('hasMany', async (t) => {
     },
   })
 
-  await createTestData(orm)
+  await createTestData(orm.knex)
 
   t.deepEqual(await orm.graphql(usersQuery), {
     data: {
@@ -84,9 +94,10 @@ test.serial('hasMany', async (t) => {
 test.serial('belongsTo', async (t) => {
   const orm = new GraphORM(testConfig)
 
+  await createTestSchema(orm.knex)
   await orm.init()
-  await createTestSchema(orm)
-  await createTestData(orm)
+
+  await createTestData(orm.knex)
 
   const postsQuery = gql`
     query {

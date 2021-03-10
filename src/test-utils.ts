@@ -1,38 +1,36 @@
-import { GraphORM } from './GraphORM'
+import { Knex } from 'knex'
 
 export const testConfig = {
   connection: 'postgres://postgres:postgres@127.0.0.1:45432/postgres',
   logSql: true,
 }
 
-export async function createTestSchema(orm: GraphORM) {
-  await orm.knex.raw(`
+export async function resetDatabase(knex: Knex) {
+  await knex.raw(`
     DROP SCHEMA public CASCADE;
     CREATE SCHEMA public;
-
-    CREATE TABLE users (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) not null default ''
-    );
-
-    CREATE TABLE posts (
-      id SERIAL PRIMARY KEY,
-      user_id integer not null,
-      title VARCHAR(255) not null default ''
-    );
-
-    ALTER TABLE "posts" ADD CONSTRAINT "posts_user_id_foreign" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE;
   `)
 }
 
-export async function createTestData(orm: GraphORM) {
-  const rows = await orm
-    .knex('users')
+export async function createTestSchema(knex: Knex) {
+  await knex.schema.createTable('users', (t) => {
+    t.increments('id')
+    t.string('name').notNullable().defaultTo('')
+  })
+  await knex.schema.createTable('posts', (t) => {
+    t.increments('id')
+    t.integer('user_id').notNullable().references('users.id')
+    t.string('title').notNullable().defaultTo('')
+  })
+}
+
+export async function createTestData(knex: Knex) {
+  const rows = await knex('users')
     .insert({
       name: 'Kay',
     })
     .returning('*')
-  await orm.knex('posts').insert({
+  await knex('posts').insert({
     userId: rows[0].id,
     title: 'GraphORM is awesome',
   })
