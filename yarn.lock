@@ -1129,12 +1129,12 @@ knex-stringcase@^1.4.5:
   dependencies:
     stringcase "^4.3.1"
 
-knex-tiny-logger@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/knex-tiny-logger/-/knex-tiny-logger-2.0.0.tgz#130acfd447d043d609aa612aac7c50cdd2bc87da"
-  integrity sha512-4B3MFQyCwND4nv/TFNEw9YFotZVmneNLpTnNIb51IqTuW5Qzl2beEXElS+4oFFQOJzC5brwTiEBE2gegGRt4OA==
+knex-tiny-logger@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/knex-tiny-logger/-/knex-tiny-logger-2.1.0.tgz#11a7cc9b6979eb9dc34c8c5591abb31eff5f5b81"
+  integrity sha512-XBvxSmUK7B0peWbrvZynggP2l2AhDLJcuIUbxeoHGvC5Hen0WizcXudZOckPaX3nRPnWxkeGdRg6Vq+nt6Q+SA==
   dependencies:
-    chalk "^4.0.0"
+    chalk "^4.1.0"
 
 knex@^0.95.1:
   version "0.95.1"

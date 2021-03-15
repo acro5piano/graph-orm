@@ -17,7 +17,7 @@ import {
 } from 'graphql'
 
 // @see https://github.com/khmm12/knex-tiny-logger/issues/9
-// import knexTinyLogger from 'knex-tiny-logger'
+import knexTinyLogger from 'knex-tiny-logger'
 
 const knexStringcase = require('knex-stringcase')
 
@@ -39,9 +39,8 @@ export class GraphORM {
         connection: options.connection,
       }),
     )
-
     if (options.logSql) {
-      this.knex.on('query', (sql) => console.log(sql.sql))
+      knexTinyLogger(this.knex)
     }
 
     this.databaseSchema = new DatabaseSchema(this)

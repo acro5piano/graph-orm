@@ -15,7 +15,7 @@
     "graphql": "^15.5.0",
     "knex": "^0.95.1",
     "knex-stringcase": "^1.4.5",
-    "knex-tiny-logger": "^2.0.0",
+    "knex-tiny-logger": "^2.1.0",
     "pg": "^8.5.1",
     "pluralize": "^8.0.0",
     "remeda": "^0.0.27",
